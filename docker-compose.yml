@@ -1,0 +1,77 @@
+version: "3.7"
+services:
+  prometheus:
+    image: prom/prometheus:v2.19.2
+    container_name: prometheus
+    volumes:
+      - ./prometheus/config:/etc/prometheus/
+      # - ./prometheus_db:/var/lib/prometheus
+      # - ./prometheus_db:/prometheus
+      # - ./prometheus_db:/etc/prometheus
+      # - ./alert.rules:/etc/prometheus/alert.rules
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.route-prefix=/"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    depends_on:
+      - node-exporter
+      - cadvisor
+      - kube-state-metrics
+    networks:
+      - monitor-net
+  node-exporter:
+    image: prom/node-exporter:v1.0.0
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - monitor-net
+  # kube-state-metrics:
+  #   image: quay.io/coreos/kube-state-metrics:v1.9.7
+  #   container_name: kube-state-metrics
+  #   ports:
+  #     - "18080:8080"
+  #     - "18081:8081"
+  #   networks:
+  #     - monitor-net
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitor-net
+  grafana:
+    image: grafana/grafana:7.0.4
+    container_name: grafana
+    ports:
+      - "5000:3000"
+    # restart: unless-stopped
+    volumes:
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    #   - ./data/grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=123
+      # - GF_USERS_ALLOW_SIGN_UP=false
+      # - GF_SERVER_DOMAIN=myrul.com
+      # - GF_SMTP_ENABLED=true
+      # - GF_SMTP_HOST=smtp.gmail.com:587
+      # - GF_SMTP_USER=myadrress@gmail.com
+      # - GF_SMTP_PASSWORD=mypassword
+      # - GF_SMTP_FROM_ADDRESS=myaddress@gmail.com
+    depends_on:
+      - prometheus
+    networks:
+      - monitor-net
+networks:
+  monitor-net:
+    name: monitor-net
